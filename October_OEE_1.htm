@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>October OEE Report</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      --bg-card: #ffffff;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --border-color: #cbd5e1;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+      --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+
+      --accent-blue: #2563eb;
+      --accent-blue-hover: #1d4ed8;
+      --table-header-bg: #f1f5f9;
+      --table-row-hover: #f8fafc;
+      --table-border: #e2e8f0;
+
+      --status-green: #10b981;
+      --status-blue: #3b82f6;
+      --status-red: #ef4444;
+    }
+
+    [data-theme="dark"] {
+      --bg-gradient: linear-gradient(135deg, #0f172a 0%, #020617 100%);
+      --bg-card: #1e293b;
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #64748b;
+      --border-color: #334155;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+
+      --accent-blue: #3b82f6;
+      --accent-blue-hover: #60a5fa;
+      --table-header-bg: #0f172a;
+      --table-row-hover: #334155;
+      --table-border: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+    }
+
+    body {
+      background: var(--bg-gradient);
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .container { max-width: 1600px; margin: 0 auto; }
+
+    /* Top Navigation Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      background: var(--bg-card);
+      padding: 16px 24px;
+      border-radius: 16px;
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-md);
+      flex-wrap: wrap;
+      gap: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header-title-zone { display: flex; align-items: center; gap: 12px; }
+    .header-title-zone h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; }
+
+    .badge-month {
+      background: rgba(37, 99, 235, 0.1);
+      color: var(--accent-blue);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border: 1px solid rgba(37, 99, 235, 0.2);
+    }
+
+    .controls-zone { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+    /* Auto-switch countdown */
+    .auto-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .auto-progress {
+      position: absolute;
+      left: 0; bottom: 0;
+      height: 3px;
+      width: 100%;
+      background: linear-gradient(90deg, var(--accent-blue), #10b981);
+      transform-origin: left center;
+      transform: scaleX(0);
+      transition: transform 1s linear;
+    }
+
+    /* Segmented Button Control */
+    .process-toggle {
+      display: flex;
+      background: var(--table-header-bg);
+      border: 1px solid var(--border-color);
+      padding: 4px;
+      border-radius: 12px;
+    }
+
+    .process-btn {
+      padding: 8px 20px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .process-btn.active {
+      background-color: var(--accent-blue);
+      color: #ffffff;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .theme-toggle-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 8px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+      font-size: 0.85rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .theme-toggle-btn:hover { background: var(--table-header-bg); }
+
+    /* KPI Grid */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(200px, 1fr)) minmax(220px, 1.2fr);
+      grid-template-rows: repeat(2, 1fr);
+      grid-template-areas:
+        "a b c d"
+        "e f g d";
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .kpi-grid .kpi-card:nth-child(1) { grid-area: a; }
+    .kpi-grid .kpi-card:nth-child(2) { grid-area: b; }
+    .kpi-grid .kpi-card:nth-child(3) { grid-area: c; }
+    .kpi-grid .kpi-card:nth-child(4) { grid-area: d; }
+    .kpi-grid .kpi-card:nth-child(5) { grid-area: e; }
+    .kpi-grid .kpi-card:nth-child(6) { grid-area: f; }
+    .kpi-grid .kpi-card:nth-child(7) { grid-area: g; }
+
+    @media (max-width: 900px) {
+      .kpi-grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        grid-template-rows: none;
+        grid-template-areas: none;
+      }
+      .kpi-grid .kpi-card:nth-child(1),
+      .kpi-grid .kpi-card:nth-child(2),
+      .kpi-grid .kpi-card:nth-child(3),
+      .kpi-grid .kpi-card:nth-child(4),
+      .kpi-grid .kpi-card:nth-child(5),
+      .kpi-grid .kpi-card:nth-child(6),
+      .kpi-grid .kpi-card:nth-child(7) { grid-area: auto; }
+    }
+
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 20px;
+      border-radius: 16px;
+      box-shadow: var(--shadow-md);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 4px; height: 100%;
+      background: var(--accent-blue);
+    }
+
+    .kpi-info { display: flex; flex-direction: column; gap: 4px; }
+
+    .kpi-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .kpi-value { font-size: 1.8rem; font-weight: 700; letter-spacing: -0.03em; }
+
+    .kpi-icon-wrapper {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      background: rgba(37, 99, 235, 0.1);
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Featured (larger) KPI card - Overall OEE% */
+    .kpi-card.kpi-featured {
+      padding: 28px 32px;
+      background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(16, 185, 129, 0.08));
+      border: 1px solid rgba(37, 99, 235, 0.25);
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .kpi-card.kpi-featured::before {
+      width: 6px;
+      background: linear-gradient(180deg, var(--accent-blue), #10b981);
+    }
+
+    .kpi-card.kpi-featured .kpi-title { font-size: 0.95rem; }
+    .kpi-card.kpi-featured .kpi-value { font-size: 3.2rem; }
+    .kpi-card.kpi-featured .kpi-icon-wrapper { width: 68px; height: 68px; background: rgba(37, 99, 235, 0.15); }
+    .kpi-card.kpi-featured .kpi-icon-wrapper i { width: 32px; height: 32px; }
+
+    @media (max-width: 640px) {
+      .kpi-card.kpi-featured { grid-column: span 1; }
+      .kpi-card.kpi-featured .kpi-value { font-size: 2.4rem; }
+    }
+
+    /* Dashboard Layout Panels */
+    .view-panel { display: none; flex-direction: column; gap: 24px; animation: fadeIn 0.3s ease-in-out; }
+    .view-panel.active { display: flex; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: var(--shadow-md);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chart-card.full-width { grid-column: 1 / -1; }
+
+    .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+
+    .chart-header h2 { font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+
+    .chart-container-lg { position: relative; height: 380px; width: 100%; }
+    .chart-container-md { position: relative; height: 340px; width: 100%; }
+
+    /* Data Table Card */
+    .table-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: var(--shadow-md);
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      max-height: 520px;
+      overflow-y: auto;
+      border-radius: 8px;
+      border: 1px solid var(--table-border);
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.825rem; text-align: right; }
+
+    th, td { padding: 10px 14px; white-space: nowrap; }
+
+    th {
+      background-color: var(--table-header-bg);
+      color: var(--text-secondary);
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 2px solid var(--table-border);
+    }
+
+    th:first-child, td:first-child {
+      text-align: left;
+      position: sticky;
+      left: 0;
+      background-color: var(--bg-card);
+      z-index: 5;
+    }
+
+    th:first-child { background-color: var(--table-header-bg); z-index: 15; }
+
+    td { border-bottom: 1px solid var(--table-border); color: var(--text-primary); }
+
+    tbody tr:hover td { background-color: var(--table-row-hover); }
+
+    tfoot tr td {
+      background-color: var(--table-header-bg);
+      font-weight: 700;
+      border-top: 2px solid var(--table-border);
+      position: sticky;
+      bottom: 0;
+      z-index: 8;
+    }
+
+    .table-note { font-size: 0.75rem; color: var(--text-muted); margin-top: 10px; }
+
+    /* Metric Badges for Table OEE */
+    .oee-badge { padding: 2px 8px; border-radius: 6px; font-weight: 700; display: inline-block; }
+    .oee-high { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+    .oee-mid { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+    .oee-low { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+    /* Legend Indicator Box */
+    .color-legend { display: flex; gap: 16px; font-size: 0.75rem; font-weight: 500; }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-box { width: 12px; height: 12px; border-radius: 3px; }
+
+    @media (max-width: 1200px) {
+      .charts-row { grid-template-columns: 1fr; }
+      .charts-row .chart-card { grid-column: auto !important; }
+    }
+  </style>
+</head>
+<body data-theme="light">
+
+  <div class="container">
+    <header class="header">
+      <div class="header-title-zone">
+        <i data-lucide="factory" style="width: 28px; height: 28px; color: var(--accent-blue);"></i>
+        <h1>October OEE Report</h1>
+        <span class="badge-month">October</span>
+      </div>
+
+      <div class="controls-zone">
+        <div class="auto-indicator">
+          <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i>
+          <span>Auto-switch in <strong id="auto-count">30</strong>s</span>
+        </div>
+
+        <div class="process-toggle">
+          <button class="process-btn active" id="btn-welding" onclick="userSwitch('welding')">
+            <i data-lucide="zap" style="width: 16px; height: 16px;"></i> Welding
+          </button>
+          <button class="process-btn" id="btn-molding" onclick="userSwitch('molding')">
+            <i data-lucide="box" style="width: 16px; height: 16px;"></i> Moulding
+          </button>
+        </div>
+
+        <button class="theme-toggle-btn" onclick="toggleTheme()">
+          <i data-lucide="moon" id="theme-icon" style="width: 16px; height: 16px;"></i>
+          <span id="theme-text">Dark Mode</span>
+        </button>
+      </div>
+      <div class="auto-progress" id="auto-progress"></div>
+    </header>
+
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <span class="kpi-title">Good Products</span>
+          <span class="kpi-value" id="kpi-good">0</span>
+        </div>
+        <div class="kpi-icon-wrapper"><i data-lucide="check-circle-2"></i></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <span class="kpi-title">Shift Open Hours</span>
+          <span class="kpi-value" id="kpi-hrs">0</span>
+        </div>
+        <div class="kpi-icon-wrapper"><i data-lucide="clock"></i></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <span class="kpi-title">Machines</span>
+          <span class="kpi-value" id="kpi-lines">0</span>
+        </div>
+        <div class="kpi-icon-wrapper"><i data-lucide="activity"></i></div>
+      </div>
+
+      <div class="kpi-card kpi-featured">
+        <div class="kpi-info">
+          <span class="kpi-title">Overall OEE %</span>
+          <span class="kpi-value" id="kpi-oee">0%</span>
+        </div>
+        <div class="kpi-icon-wrapper"><i data-lucide="gauge"></i></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <span class="kpi-title">Availability %</span>
+          <span class="kpi-value" id="kpi-avail">0%</span>
+        </div>
+        <div class="kpi-icon-wrapper"><i data-lucide="power"></i></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <span class="kpi-title">Performance %</span>
+          <span class="kpi-value" id="kpi-perf">0%</span>
+        </div>
+        <div class="kpi-icon-wrapper"><i data-lucide="zap"></i></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <span class="kpi-title">Quality %</span>
+          <span class="kpi-value" id="kpi-qual">0%</span>
+        </div>
+        <div class="kpi-icon-wrapper"><i data-lucide="badge-check"></i></div>
+      </div>
+    </section>
+
+    <!-- ================= WELDING ================= -->
+    <div id="welding-panel" class="view-panel active">
+      <div class="chart-card full-width">
+        <div class="chart-header">
+          <h2><i data-lucide="bar-chart-3" style="color: var(--accent-blue);"></i> Welding - OEE % by Machine</h2>
+          <div class="color-legend">
+            <div class="legend-item"><div class="legend-box" style="background: #10b981;"></div> &ge; 70%</div>
+            <div class="legend-item"><div class="legend-box" style="background: #3b82f6;"></div> 50% - 69%</div>
+            <div class="legend-item"><div class="legend-box" style="background: #ef4444;"></div> &lt; 50%</div>
+          </div>
+        </div>
+        <div class="chart-container-lg">
+          <canvas id="weldingOeeChart"></canvas>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card" style="grid-column: span 2;">
+          <div class="chart-header">
+            <h2><i data-lucide="alert-triangle" style="color: #f59e0b;"></i> Production Loss Pareto Chart (Hours)</h2>
+          </div>
+          <div class="chart-container-md">
+            <canvas id="weldingParetoChart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <h2><i data-lucide="pie-chart" style="color: #8b5cf6;"></i> Production Downfall (Hours)</h2>
+          </div>
+          <div class="chart-container-md">
+            <canvas id="weldingPieChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="chart-header">
+          <h2><i data-lucide="table" style="color: var(--accent-blue);"></i> Welding Machines Performance Register</h2>
+        </div>
+        <div class="table-wrapper">
+          <table id="weldingTable">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Total Theoritical hrs</th>
+                <th>Shift Open Hrs</th>
+                <th>Good Qty</th>
+                <th>Total Qty</th>
+                <th>Availability %</th>
+                <th>Performance %</th>
+                <th>Quality %</th>
+                <th>OEE %</th>
+                <th>Break Down (hrs)</th>
+                <th>Material Shortage (hrs)</th>
+                <th>People Unavailable (hrs)</th>
+                <th>No Order (hrs)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+            <tfoot></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= MOULDING ================= -->
+    <div id="molding-panel" class="view-panel">
+      <div class="chart-card full-width">
+        <div class="chart-header">
+          <h2><i data-lucide="bar-chart-3" style="color: var(--accent-blue);"></i> Moulding - OEE % by Machine</h2>
+          <div class="color-legend">
+            <div class="legend-item"><div class="legend-box" style="background: #10b981;"></div> &ge; 70%</div>
+            <div class="legend-item"><div class="legend-box" style="background: #3b82f6;"></div> 50% - 69%</div>
+            <div class="legend-item"><div class="legend-box" style="background: #ef4444;"></div> &lt; 50%</div>
+          </div>
+        </div>
+        <div class="chart-container-lg">
+          <canvas id="moldingOeeChart"></canvas>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card" style="grid-column: span 2;">
+          <div class="chart-header">
+            <h2><i data-lucide="alert-triangle" style="color: #f59e0b;"></i> Production Loss Pareto Chart (Hours)</h2>
+          </div>
+          <div class="chart-container-md">
+            <canvas id="moldingParetoChart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <h2><i data-lucide="pie-chart" style="color: #8b5cf6;"></i> Production Downfall (Hours)</h2>
+          </div>
+          <div class="chart-container-md">
+            <canvas id="moldingPieChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="chart-header">
+          <h2><i data-lucide="table" style="color: var(--accent-blue);"></i> Moulding Machines Performance Register</h2>
+        </div>
+        <div class="table-wrapper">
+          <table id="moldingTable">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Total Theoritical hrs</th>
+                <th>Shift Open Hrs</th>
+                <th>Good Qty</th>
+                <th>Total Qty</th>
+                <th>Availability %</th>
+                <th>Performance %</th>
+                <th>Quality %</th>
+                <th>OEE %</th>
+                <th>Machine Breakdown (min)</th>
+                <th>Material Shortage (min)</th>
+                <th>People Unavailable (min)</th>
+                <th>No Order (min)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+            <tfoot></tfoot>
+          </table>
+        </div>
+        <p class="table-note">Machine-wise downtime values are in minutes; the Total row is in hours, as in the source data. "-" = downtime not available for that machine.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    Chart.register(ChartDataLabels);
+
+    // ---------- Theme helpers (scriptable, so charts follow theme on update) ----------
+    function isDarkMode() { return document.body.getAttribute('data-theme') === 'dark'; }
+    function getThemeTextColor() { return isDarkMode() ? '#f8fafc' : '#0f172a'; }
+    function getThemeGridColor() { return isDarkMode() ? '#334155' : '#e2e8f0'; }
+
+    // OEE colour rule: >= 70 green, 50-69 blue, < 50 red
+    function getOeeBarColor(v) {
+      if (v >= 70) return '#10b981';
+      if (v >= 50) return '#3b82f6';
+      return '#ef4444';
+    }
+
+    // ---------- RAW DATA ----------
+    // [Model, Total theoritical hrs, Shift open hrs, Good Qty, Total Qty, Availability, Performance, Quality, OEE, Break down, Material shortage, People unavailable, No Order]
+    const rawWelding = [
+      ["US 01","232.7133333","322","62662","62793","72%","100%","100%","72%","23.5","70.91666667","3.583333333","58.5"],
+      ["US 02","222.7111111","304.0833333","80176","80333","73%","100%","100%","73%","34.66666667","37.25","2.833333333","19.83333333"],
+      ["US 03","343.2805556","474.4166667","123581","123758","72%","100%","100%","72%","20.75","35.41666667","2.583333333","5.583333333"],
+      ["US 04","139.6236111","297.1666667","34168","34276","47%","101%","100%","47%","6.666666667","23","2.833333333","6"],
+      ["US 05","213.8333333","391.1666667","51320","51465","55%","100%","100%","55%","24.83333333","28","8.666666667","13.16666667"],
+      ["US 07","234.4622222","316.5","60226","60510","74%","100%","100%","74%","23.58333333","55.16666667","0.5","36.66666667"],
+      ["US 08","263.6277778","337.5833333","67790","67891","78%","100%","100%","78%","23","42.33333333","1.5","3"],
+      ["US 09","309.2872222","381.5833333","79531","79658","81%","100%","100%","81%","18.66666667","68.75","2.75","8.916666667"],
+      ["US 10","226.3475","411.75","90539","90691","55%","100%","100%","55%","19.41666667","6.25","3.5","18.75"],
+      ["US 11","139.6344444","172.0833333","75548","75705","81%","101%","100%","82%","6.166666667","11.58333333","1.166666667","24.41666667"],
+      ["US 12","232.8233333","300.5833333","78122","78394","77%","100%","100%","77%","20.16666667","10","4.833333333","33.58333333"],
+      ["US 13","328.1430556","455.1666667","98712","98889","72%","100%","100%","72%","12.41666667","48.5","6.5","15.83333333"],
+      ["US 14","189.3772222","261.75","93453","93709","72%","100%","100%","72%","12.41666667","17.91666667","0","40.91666667"],
+      ["US 15","114.6075","237.1666667","19887","20805","48%","100%","96%","46%","45.16666667","2.916666667","0.333333333","11.58333333"],
+      ["US 16","65.53166667","86.66666667","11234","11262","76%","100%","100%","76%","10","1.5","0","16.83333333"],
+      ["US 17","132.0258333","167.0833333","22633","22675","79%","100%","100%","79%","6","3.75","0","25.16666667"],
+      ["US 18","217.7638889","400.25","78395","78525","54%","100%","100%","54%","35.58333333","20","8.083333333","26.66666667"],
+      ["US 19","14.83611111","49.33333333","3815","3834","30%","100%","100%","30%","3.333333333","4.666666667","0","16"],
+      ["US 20","286.0488889","387.75","97842","98163","74%","100%","100%","74%","52.16666667","23.66666667","5.333333333","37.58333333"],
+      ["US 21","145.4786111","312.75","37189","37311","47%","100%","100%","46%","48.33333333","24.91666667","1.5","45.83333333"],
+      ["US 22","311.9766667","406.5","93593","93775","77%","100%","100%","77%","11.75","89.33333333","0.5","7.666666667"],
+      ["US 23","314.575","400","113247","113363","79%","100%","100%","79%","37.25","12.33333333","0.833333333","27.16666667"],
+      ["US 24","294.1133333","409.1666667","88234","85609","72%","97%","103%","72%","10","69","5.833333333","6"],
+      ["US 25","262.61","347.1666667","78783","79052","76%","100%","100%","76%","10.41666667","77.91666667","11.16666667","4.75"],
+      ["US 26","405.1075","566.0833333","69447","69662","72%","100%","100%","72%","73","64.75","0.666666667","40.5"],
+      ["US 28","215.8041667","494.1666667","36995","37116","44%","100%","100%","44%","38.33333333","47.83333333","0.166666667","3.833333333"],
+      ["US 29","107.7883333","151.4166667","18478","18517","71%","100%","100%","71%","19.33333333","5.75","2.5","8.333333333"],
+      ["US 32","106.9716667","165.0833333","18338","18376","65%","100%","100%","65%","27.5","5.083333333","0.833333333","11"],
+      ["US 34","302.1472222","382.4166667","108773","108949","79%","100%","100%","79%","34.33333333","20.58333333","0","17"],
+      ["US 35","316.4527778","492.8333333","113923","114291","64%","94%","100%","60%","67.58333333","38.25","1.5","13.41666667"],
+      ["US 36","310.0033333","419.0833333","93001","93135","74%","100%","100%","74%","20.33333333","78.41666667","4","16.5"],
+      ["US 37","198.8725","345.0833333","34421","34534","58%","100%","100%","57%","44.66666667","3.833333333","0.833333333","14.25"],
+      ["US 38","38.24916667","70.66666667","6557","6573","54%","100%","100%","54%","7","1.083333333","0","12.25"],
+      ["US 39","49.14","89.83333333","8424","8435","55%","100%","100%","55%","7","2.333333333","0","12.83333333"],
+      ["US 40","13.30583333","27.08333333","2281","2285","49%","100%","100%","49%","3.583333333","0.833333333","0","7.083333333"],
+      ["US 41","194.355","262.1666667","33318","33379","74%","100%","100%","74%","30.66666667","30.66666667","0","8.166666667"],
+      ["US 42","224.8633333","318.75","38858","38967","71%","100%","100%","70%","55.08333333","25.91666667","12","28.33333333"],
+      ["US 43","16.00083333","30","2743","2760","53%","101%","99%","53%","8.083333333","0","0","5"],
+      ["AUTOMATIC 44","5.416666667","41.58333333","7800","7819","13%","100%","100%","13%","24.08333333","0.416666667","0","0"],
+      ["US 45","128.4441667","228.9166667","24266","24340","56%","111%","100%","62%","36.66666667","12.16666667","0","25.83333333"]
+    ];
+    const totalWelding = ["Total","7868.35","11714.83","2258303","2261584","67.17%","112.61%","99.85%","74%","1013.50","1123.00","97.33","734.75"];
+
+    // MOULDING - updated from the latest photo (columns up to OEE %).
+    // Downtime columns (breakdown / material shortage / people / no order, in minutes) are carried over
+    // from the previous version; machines new in this photo (TKC 29, 25, 26) have no downtime data ("-").
+    const rawMolding = [
+      ["TKC 1","218.6019444","307.6666667","14040","14309","71%","96%","98%","67%","70","3365","2090","2210"],
+      ["TKC 4","312.94","442.3333333","24237","25038","71%","100%","94%","67%","1105","440","340","395"],
+      ["TKC 8","259.90","357.0833333","20460","20806","73%","100%","100%","73%","30","4020","0","900"],
+      ["TKC 9","275.58","365.9166667","22046","21860","75%","99%","101%","75%","120","3650","510","1575"],
+      ["TKC 10","47.27","100.0833333","2926","2933","47%","155%","100%","73%","0","6410","295","1735"],
+      ["TKC 14","180.24","293.8333333","17625","17910","61%","101%","97%","60%","0","580","415","715"],
+      ["YIZUMI","104.80","176.25","4477","4493","59%","71%","100%","42%","50","6520","365","1960"],
+      ["TKC 21","259.36","414.5","26840","27289","63%","102%","98%","63%","325","3925","195","1870"],
+      ["TKC 19","207.66","403.25","19935","20226","51%","101%","99%","51%","1215","1460","195","1210"],
+      ["TKC 24","388.40","477.1666667","19975","20531","81%","103%","97%","81%","180","1655","1145","2355"],
+      ["TKC 29","72.71","104.5","1179","1183","70%","100%","100%","70%","-","-","-","-"],
+      ["TKC 25","84.98","128.25","1378","1384","66%","100%","100%","66%","-","-","-","-"],
+      ["TKC 26","78.56","125.3333333","1274","1275","63%","100%","100%","63%","-","-","-","-"],
+      ["DZM 01","54.60","91.08333333","3276","3346","60%","102%","98%","60%","0","845","90","280"],
+      ["TKC 2","281.7266667","361.4166667","17178","17279","78%","102%","99%","79%","0","1615","1880","1650"],
+      ["TKC 3","222.77","285.8333333","13366","13808","78%","103%","97%","78%","0","1605","1660","715"],
+      ["TKC 7","327.82","384.25","14752","14752","85%","100%","100%","85%","40","3315","280","900"],
+      ["TKC 11","237.93","339.6666667","10707","10738","70%","100%","100%","70%","0","5570","1380","2100"],
+      ["TKC 12","306.49","369.75","29941","30498","83%","98%","98%","80%","500","3215","625","1305"],
+      ["TKC 13","129.23","176.0833333","7754","7986","73%","103%","97%","73%","465","2495","990","1980"],
+      ["TKC 20","398.80","496.1666667","39334","39927","80%","101%","99%","80%","0","1870","605","945"],
+      ["TKC 17","409.37","505.8333333","40376","40561","81%","100%","100%","81%","0","785","105","575"],
+      ["TKC 18","238.36","403.75","23509","24166","59%","103%","97%","59%","355","1905","830","1115"],
+      ["TKC 23","295.43","383.4166667","17726","18387","77%","104%","96%","77%","850","3855","1710","1660"],
+      ["TKC 22","396.24","482.75","24465","24601","82%","100%","99%","82%","595","1810","905","1755"],
+      ["TKC 15","393.68","511","38829","39393","77%","111%","99%","84%","70","1145","120","1550"],
+      ["TKC 16","403.54","506.9166667","39801","40161","80%","101%","99%","80%","30","495","195","625"],
+      ["TKC 31","109.47","188.25","3284","3285","58%","100%","100%","58%","15","3270","240","1155"],
+      ["TKC 30","80.57","142.8333333","2412","2419","56%","100%","100%","56%","90","4410","280","1370"],
+      ["TKC 28","269.98","369.5833333","12149","12149","73%","100%","100%","73%","30","2260","130","725"],
+      ["TKC 27","85.04","100.0833333","1379","1385","85%","100%","100%","85%","0","1150","0","150"],
+      ["TKC 34","241.80","341","10881","10881","71%","100%","100%","71%","120","5910","650","2330"],
+      ["TKC 32","394.10","439.5833333","11823","11866","90%","100%","100%","90%","245","5425","225","1115"],
+      ["TKC 33","272.73","374.75","8182","8208","73%","100%","100%","73%","1245","5100","480","1470"],
+      ["TKC 39","146.42","195.1666667","5271","5308","75%","101%","99%","75%","300","7160","420","2630"],
+      ["TKC 40","122.19","153.4166667","4399","4409","80%","100%","100%","80%","300","7375","180","2230"],
+      ["TKC 41","92.39","124.0833333","3326","3339","74%","100%","100%","74%","300","6500","180","2765"],
+      ["TKC 42","101.31","136.8333333","3647","3650","74%","100%","100%","74%","0","7015","180","2595"]
+    ];
+    // Totals from the photo; downtime totals (hours) kept from the previous version.
+    const totalMolding = ["Total","8503","11560","547516.00","555033.00","74%","101%","99%","74%","144.0833","1968.75","331.5","843.58"];
+
+    // ---------- Dashboard state (everything derived from the tables above) ----------
+    const num = s => parseFloat(s);
+    const fmtInt = s => Math.round(num(s)).toLocaleString('en-IN');
+
+    function buildState(rows, total) {
+      return {
+        good: fmtInt(total[3]),
+        hrs: num(total[2]).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        lines: String(rows.length),
+        oee: total[8],
+        avail: total[5],
+        perf: total[6],
+        qual: total[7],
+        oeeLabels: rows.map(r => r[0]),
+        oeeValues: rows.map(r => num(r[8])),
+        // downtime totals in hours (from the Total row): [Machine Breakdown, Material Shortage, People Unavailable, No Order]
+        down: [num(total[9]), num(total[10]), num(total[11]), num(total[12])]
+      };
+    }
+
+    const DOWN_LABELS = ["Machine Breakdown", "Material Shortage", "People Unavailable", "No Order"];
+    const DOWN_COLORS = ["#ef4444", "#f59e0b", "#3b82f6", "#8b5cf6"];
+
+    const dashboardState = {
+      welding: buildState(rawWelding, totalWelding),
+      molding: buildState(rawMolding, totalMolding)
+    };
+
+    let weldingOeeChart, weldingParetoChart, weldingPieChart;
+    let moldingOeeChart, moldingParetoChart, moldingPieChart;
+
+    const r2 = v => Math.round(v * 100) / 100;
+
+    // Pareto: sort downtime descending + cumulative %
+    function buildPareto(down) {
+      const items = DOWN_LABELS.map((l, i) => ({ l, v: down[i] })).sort((a, b) => b.v - a.v);
+      const total = items.reduce((s, x) => s + x.v, 0);
+      let cum = 0;
+      return {
+        labels: items.map(x => x.l),
+        values: items.map(x => x.v),
+        cumulative: items.map(x => { cum += x.v; return parseFloat((cum / total * 100).toFixed(1)); })
+      };
+    }
+
+    // ---------- Tables ----------
+    function oeeClass(v) { return v >= 70 ? 'oee-high' : v >= 50 ? 'oee-mid' : 'oee-low'; }
+
+    function renderTable(tableId, rows, total, footUnit) {
+      const tbody = document.querySelector('#' + tableId + ' tbody');
+      const tfoot = document.querySelector('#' + tableId + ' tfoot');
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td><strong>${r[0]}</strong></td>
+          <td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td>
+          <td>${r[5]}</td><td>${r[6]}</td><td>${r[7]}</td>
+          <td><span class="oee-badge ${oeeClass(num(r[8]))}">${r[8]}</span></td>
+          <td>${r[9]}</td><td>${r[10]}</td><td>${r[11]}</td><td>${r[12]}</td>
+        </tr>`).join('');
+      tfoot.innerHTML = `
+        <tr>
+          <td>${total[0]}</td>
+          <td>${total[1]}</td><td>${total[2]}</td><td>${total[3]}</td><td>${total[4]}</td>
+          <td>${total[5]}</td><td>${total[6]}</td><td>${total[7]}</td>
+          <td><span class="oee-badge ${oeeClass(num(total[8]))}">${total[8]}</span></td>
+          <td>${total[9]}${footUnit}</td><td>${total[10]}${footUnit}</td><td>${total[11]}${footUnit}</td><td>${total[12]}${footUnit}</td>
+        </tr>`;
+    }
+
+    // ---------- Chart builders ----------
+    function oeeBar(canvasId, st) {
+      return new Chart(document.getElementById(canvasId).getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: st.oeeLabels,
+          datasets: [{ label: 'OEE %', data: st.oeeValues, backgroundColor: st.oeeValues.map(getOeeBarColor), borderRadius: 4 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            datalabels: {
+              anchor: 'end', align: 'top',
+              color: () => getThemeTextColor(),
+              font: { weight: 'bold', size: 9 },
+              formatter: v => v + '%'
+            }
+          },
+          scales: {
+            x: { ticks: { color: () => getThemeTextColor(), font: { size: 10 }, autoSkip: false, maxRotation: 90, minRotation: 45 }, grid: { display: false } },
+            y: { max: 110, ticks: { color: () => getThemeTextColor(), callback: v => v + '%' }, grid: { color: () => getThemeGridColor() } }
+          }
+        }
+      });
+    }
+
+    function paretoChart(canvasId, st, barColor) {
+      const p = buildPareto(st.down);
+      return new Chart(document.getElementById(canvasId).getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: p.labels,
+          datasets: [
+            { type: 'bar', label: 'Loss (Hours)', data: p.values, backgroundColor: barColor, borderRadius: 6, yAxisID: 'y' },
+            {
+              type: 'line', label: 'Cumulative %', data: p.cumulative,
+              borderColor: '#ef4444', backgroundColor: '#ef4444', borderWidth: 2, yAxisID: 'y1',
+              datalabels: { align: 'top', formatter: v => v + '%' }
+            }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: () => getThemeTextColor() } },
+            datalabels: {
+              color: () => getThemeTextColor(),
+              font: { weight: 'bold', size: 11 },
+              formatter: v => r2(v)
+            }
+          },
+          scales: {
+            x: { ticks: { color: () => getThemeTextColor() }, grid: { display: false } },
+            y: { ticks: { color: () => getThemeTextColor() }, grid: { color: () => getThemeGridColor() }, title: { display: true, text: 'Hours', color: () => getThemeTextColor() } },
+            y1: { max: 110, position: 'right', ticks: { color: () => getThemeTextColor(), callback: v => v + '%' }, grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    function downPie(canvasId, st) {
+      const total = st.down.reduce((a, b) => a + b, 0);
+      const small = ctx => ctx.dataset.data[ctx.dataIndex] / total < 0.08;
+      return new Chart(document.getElementById(canvasId).getContext('2d'), {
+        type: 'pie',
+        data: { labels: DOWN_LABELS, datasets: [{ data: st.down, backgroundColor: DOWN_COLORS, borderColor: 'transparent', borderWidth: 0, offset: ctx => small(ctx) ? 10 : 0 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          layout: { padding: 34 },
+          plugins: {
+            legend: { position: 'bottom', labels: { color: () => getThemeTextColor(), font: { size: 11 } } },
+            datalabels: {
+              // small slices get their label outside so they stay visible
+              anchor: ctx => small(ctx) ? 'end' : 'center',
+              align: ctx => small(ctx) ? 'end' : 'center',
+              offset: ctx => small(ctx) ? 6 : 0,
+              color: ctx => small(ctx) ? getThemeTextColor() : '#ffffff',
+              font: { weight: 'bold', size: 11 },
+              textAlign: 'center',
+              formatter: (v, ctx) => r2(v) + 'h\n(' + (v * 100 / total).toFixed(1) + '%)'
+            }
+          }
+        }
+      });
+    }
+
+    function initCharts() {
+      const w = dashboardState.welding, m = dashboardState.molding;
+      weldingOeeChart = oeeBar('weldingOeeChart', w);
+      weldingParetoChart = paretoChart('weldingParetoChart', w, '#3b82f6');
+      weldingPieChart = downPie('weldingPieChart', w);
+      moldingOeeChart = oeeBar('moldingOeeChart', m);
+      moldingParetoChart = paretoChart('moldingParetoChart', m, '#2563eb');
+      moldingPieChart = downPie('moldingPieChart', m);
+    }
+
+    // ---------- View switching ----------
+    let currentView = 'welding';
+
+    function switchView(mode) {
+      currentView = mode;
+      document.getElementById('btn-welding').classList.toggle('active', mode === 'welding');
+      document.getElementById('btn-molding').classList.toggle('active', mode === 'molding');
+      document.getElementById('welding-panel').classList.toggle('active', mode === 'welding');
+      document.getElementById('molding-panel').classList.toggle('active', mode === 'molding');
+
+      const d = dashboardState[mode];
+      document.getElementById('kpi-good').innerText = d.good;
+      document.getElementById('kpi-hrs').innerText = d.hrs;
+      document.getElementById('kpi-lines').innerText = d.lines;
+      document.getElementById('kpi-avail').innerText = d.avail;
+      document.getElementById('kpi-perf').innerText = d.perf;
+      document.getElementById('kpi-qual').innerText = d.qual;
+      document.getElementById('kpi-oee').innerText = d.oee;
+
+      // charts hidden at init size themselves on first show
+      [weldingOeeChart, weldingParetoChart, weldingPieChart, moldingOeeChart, moldingParetoChart, moldingPieChart]
+        .forEach(c => { if (c) c.resize(); });
+    }
+
+    // ---------- Auto-switch every 30 seconds ----------
+    const AUTO_SECONDS = 30;
+    let autoRemaining = AUTO_SECONDS;
+    let autoTimer = null;
+
+    function updateAutoUI() {
+      document.getElementById('auto-count').innerText = autoRemaining;
+      const bar = document.getElementById('auto-progress');
+      bar.style.transform = 'scaleX(' + ((AUTO_SECONDS - autoRemaining) / AUTO_SECONDS) + ')';
+    }
+
+    function autoTick() {
+      autoRemaining--;
+      if (autoRemaining <= 0) {
+        switchView(currentView === 'welding' ? 'molding' : 'welding');
+        autoRemaining = AUTO_SECONDS;
+      }
+      updateAutoUI();
+    }
+
+    function startAutoSwitch() {
+      clearInterval(autoTimer);
+      autoRemaining = AUTO_SECONDS;
+      updateAutoUI();
+      autoTimer = setInterval(autoTick, 1000);
+    }
+
+    // Manual click: switch view and restart the 30s countdown
+    function userSwitch(mode) {
+      switchView(mode);
+      startAutoSwitch();
+    }
+
+    // ---------- Light / Dark ----------
+    function toggleTheme() {
+      const newTheme = isDarkMode() ? 'light' : 'dark';
+      document.body.setAttribute('data-theme', newTheme);
+      document.getElementById('theme-icon').setAttribute('data-lucide', newTheme === 'dark' ? 'sun' : 'moon');
+      document.getElementById('theme-text').innerText = newTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
+      lucide.createIcons();
+      [weldingOeeChart, weldingParetoChart, weldingPieChart, moldingOeeChart, moldingParetoChart, moldingPieChart]
+        .forEach(c => { if (c) c.update(); });
+    }
+
+    window.onload = () => {
+      lucide.createIcons();
+      renderTable('weldingTable', rawWelding, totalWelding, '');
+      renderTable('moldingTable', rawMolding, totalMolding, ' hrs');
+      initCharts();
+      switchView('welding');
+      startAutoSwitch();
+    };
+  </script>
+</body>
+</html>
